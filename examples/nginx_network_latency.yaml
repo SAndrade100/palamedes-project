@@ -1,0 +1,43 @@
+experiment:
+  id: nginx-network-latency-01
+  description: >
+    nginx frontend experiences artificial 200ms network latency injected into
+    the upstream container interface.  Measures latency percentile degradation
+    and recovery profile.
+
+  target:
+    compose_file: ./docker-compose.yml
+    container: nginx-frontend
+
+  phases:
+    warmup:
+      duration_seconds: 45
+    baseline:
+      duration_seconds: 90
+    recovery_timeout_seconds: 120
+
+  load:
+    driver: asyncio
+    config:
+      target_url: http://localhost:80/
+      method: GET
+      arrival_rate_rps: 50.0
+
+  fault:
+    type: network_latency
+    target_container: nginx-frontend
+    trigger:
+      type: temporal
+      offset_seconds: 20
+    duration_seconds: 45
+    parameters:
+      interface: eth0
+      latency_ms: 200
+      jitter_ms: 30
+
+  sla:
+    max_error_rate_percent: 0.5
+    max_p99_latency_ms: 800.0
+
+  metrics:
+    collection_interval_ms: 500

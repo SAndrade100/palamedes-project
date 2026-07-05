@@ -1,0 +1,49 @@
+experiment:
+  id: worker-cpu-stress-01
+  description: >
+    A worker container is CPU-stressed to 2 cores while serving requests.
+    Fault is triggered reactively when CPU usage exceeds 60%.
+
+  target:
+    compose_file: ./docker-compose.yml
+    container: worker-service
+
+  phases:
+    warmup:
+      duration_seconds: 30
+      steady_state:
+        metric: throughput_rps
+        min_value: 20.0
+        stability_window_seconds: 5
+    baseline:
+      duration_seconds: 60
+    recovery_timeout_seconds: 180
+
+  load:
+    driver: asyncio
+    config:
+      target_url: http://localhost:9000/task
+      method: POST
+      arrival_rate_rps: 30.0
+
+  fault:
+    type: cpu_stress
+    target_container: worker-service
+    trigger:
+      type: reactive
+      metric: cpu_percent
+      threshold: 60.0
+      comparator: gt
+    duration_seconds: 60
+    parameters:
+      workers: 2
+
+  sla:
+    max_error_rate_percent: 5.0
+    max_p99_latency_ms: 2000.0
+
+  metrics:
+    collection_interval_ms: 500
+    infra:
+      - cpu_percent
+      - memory_percent

@@ -1,0 +1,59 @@
+experiment:
+  id: redis-failover-01
+  description: >
+    Redis primary container stopped under sustained HTTP load.
+    Measures MTRS, availability window, and throughput attenuation.
+
+  target:
+    compose_file: ./docker-compose.yml
+    container: redis-primary
+    service: redis
+
+  phases:
+    warmup:
+      duration_seconds: 60
+      steady_state:
+        metric: throughput_rps
+        min_value: 500.0
+        stability_window_seconds: 10
+    baseline:
+      duration_seconds: 120
+    recovery_timeout_seconds: 300
+
+  load:
+    driver: asyncio
+    config:
+      target_url: http://localhost:8080/ping
+      method: GET
+      arrival_rate_rps: 100.0
+
+  fault:
+    type: container_stop
+    target_container: redis-primary
+    trigger:
+      type: temporal
+      offset_seconds: 30
+    duration_seconds: 60
+    parameters:
+      timeout: 5
+
+  sla:
+    max_error_rate_percent: 1.0
+    max_p99_latency_ms: 500.0
+
+  metrics:
+    collection_interval_ms: 500
+    software:
+      - throughput_rps
+      - p95_latency_ms
+      - p99_latency_ms
+      - error_rate_percent
+    infra:
+      - cpu_percent
+      - memory_percent
+
+batch:
+  parameter_sweep:
+    parameter: load.config.arrival_rate_rps
+    values: [50.0, 100.0, 200.0, 400.0]
+  repeat: 3
